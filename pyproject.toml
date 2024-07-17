@@ -15,6 +15,7 @@ sqlalchemy = { extras = ["asincio"], version = "^2.0.31" }
 pydantic-settings = "^2.3.4"
 asyncpg = "^0.29.0"
 psycopg2-binary = "^2.9.9"
+alembic = "^1.13.2"
 
 
 [build-system]
