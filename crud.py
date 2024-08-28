@@ -1,6 +1,6 @@
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -250,6 +250,44 @@ async def create_gift_product_for_existing_orders(session: AsyncSession):
     await session.commit()
 
 
+async def lock_and_update_profile(
+        session: AsyncSession,
+        user_id: int,
+        new_first_name: str,
+        new_last_name: str,
+        new_bio: str
+):
+    async with session.begin():
+        query = select(Profile).where(Profile.user_id == user_id).with_for_update(read=True)
+        result = await session.execute(query)
+        item = result.scalar_one()
+
+        item.first_name = new_first_name
+        item.last_name = new_last_name
+        item.bio = new_bio
+
+        await session.commit()
+
+
+async def get_order_count_per_product(session):
+    stmt = select(Product.id, Product.name, func.count(Order.id).label('order_count')) \
+        .join(OrderProductAssociation, Product.id == OrderProductAssociation.product_id) \
+        .join(Order, Order.id == OrderProductAssociation.order_id) \
+        .group_by(Product.id)
+
+    result = await session.execute(stmt)
+    products = result.all()
+
+    for product in products:
+        print(f"Product ID: {product.id}, Product Name: {product.name}, Order Count: {product.order_count}")
+
+
+async def get_users_by_username_filter(session: AsyncSession, username: str):
+    result = await session.execute(select(User).filter(User.username == username))
+    users = result.scalars().all()
+    print(users)
+
+
 async def main_relations(session: AsyncSession):
     await create_user(session=session, username="John")
     await create_user(session=session, username="Sam")
@@ -294,10 +332,17 @@ async def demo_m2m(session: AsyncSession):
     # await create_gift_product_for_existing_orders(session)
 
 
+async def demo_3(session: AsyncSession):
+    # await lock_and_update_profile(session, 1, "John", "W", "Was born on March 8th")
+    # await get_order_count_per_product(session)
+    await get_users_by_username_filter(session, "John")
+
+
 async def main():
     async with db_helper.session_factory() as session:
         # await main_relations(session)
-        await demo_m2m(session)
+        # await demo_m2m(session)
+        await demo_3(session)
 
 
 if __name__ == "__main__":
